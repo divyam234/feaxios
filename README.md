@@ -19,6 +19,9 @@ platform like cloudflare vercel etc.
 
 While [Axios] remains an excellent module, `feaxios` provides a compelling option in scenarios where minimizing dependencies is crucial. By offering a similar API to Axios, `feaxios` bridges the gap between Axios and the native `fetch()` API.
 
+```sh
+npm install feaxios
+```
 ### Usage
 
 ```js
