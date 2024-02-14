@@ -33,10 +33,9 @@
     ],
     "clean": true,
     "treeshake": true,
-    "splitting": false,
+    "splitting":true,
     "target": "es2022",
-    "exports": "named",
-    "minify": true,
+    "minify": "terser",
     "format": [
       "cjs",
       "esm"
@@ -56,14 +55,15 @@
   "license": "MIT",
   "homepage": "https://github.com/divyam234/feaxios",
   "devDependencies": {
+    "@types/node": "^20.11.17",
     "@vitest/ui": "^1.2.2",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0 ",
     "msw": "^2.2.0",
     "prettier": "^3.2.5",
+    "terser": "^5.27.0",
+    "tsup": "^8.0.2",
     "typescript": "^5.3.3",
-    "vitest": "^1.2.2",
-    "@types/node": "^20.11.17",
-    "tsup": "^8.0.2"
+    "vitest": "^1.2.2"
   }
 }
