@@ -12,10 +12,9 @@
 
 - **Timeouts:** Easily configure timeouts for requests, ensuring your application remains responsive and resilient.
 
-- **Works on Serverless:** Works on Serverless
+- **Works on Serverless:** Works on Serverless platform like cloudflare , vercel etc.
 
 - Supports passing custom fetch options in axios client itself (needed very rarely).
-platform like cloudflare vercel etc.
 
 ### When to Use feaxios
 
