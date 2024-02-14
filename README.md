@@ -1,6 +1,6 @@
 # feaxios
 
-`feaxios` is a lightweight alternative to [Axios], providing the same familiar API with a significantly reduced footprint of **800 bytes**. It leverages the native `fetch()` API supported in all modern browsers, delivering a performant and minimalistic solution. This makes it an ideal choice for projects where minimizing bundle size is a priority.
+`feaxios` is a lightweight alternative to [Axios], providing the same familiar API with a significantly reduced footprint of **2kb**. It leverages the native `fetch()` API supported in all modern browsers, delivering a performant and minimalistic solution. This makes it an ideal choice for projects where minimizing bundle size is a priority.
 
 ### Key Features
 
