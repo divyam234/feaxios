@@ -52,6 +52,8 @@ async function parseAndValidateResponse(
 		return response;
 	}
 
+	response.rawResponse = res;
+
 	return res[options.responseType || "text"]()
 		.then((data) => {
 			if (options.transformResponse) {
@@ -107,6 +109,8 @@ async function request(
 
 	const options = deepMerge(defaults, config) as InternalAxiosRequestConfig;
 
+	options.fetchOptions = options.fetchOptions || {};
+
 	const response: AxiosResponse = { config: options } as AxiosResponse;
 
 	data = data || options.data;
@@ -153,13 +157,14 @@ async function request(
 
 	options.method = method || options.method || "get";
 
-	const request = new Request(options.url!, {
+	const init = deepMerge(options.fetchOptions, {
 		method: options.method.toUpperCase(),
 		body: data,
 		headers,
 		credentials: options.withCredentials ? "include" : undefined,
 		signal: options.signal,
 	});
+	const request = new Request(options.url!, init as RequestInit);
 
 	if (interceptors && interceptors.request.length > 0) {
 		const chain = interceptors.request

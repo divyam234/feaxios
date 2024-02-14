@@ -111,6 +111,7 @@ export interface AxiosRequestConfig<D = any> {
 	responseType?: ResponseType;
 	validateStatus?: ((status: number) => boolean) | null;
 	signal?: AbortSignal;
+	fetchOptions?: RequestInit;
 }
 
 export type RawAxiosRequestConfig<D = any> = AxiosRequestConfig<D>;
@@ -137,6 +138,7 @@ export interface AxiosResponse<T = any, D = any> {
 	headers: Headers;
 	config: InternalAxiosRequestConfig<D>;
 	request?: any;
+	rawResponse?: Response;
 }
 
 export type AxiosPromise<T = any> = Promise<AxiosResponse<T>>;
