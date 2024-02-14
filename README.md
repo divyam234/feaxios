@@ -1,5 +1,4 @@
 # feaxios
-https://deno.bundlejs.com/badge?q=feaxios@0.0.3,feaxios@0.0.3,feaxios@0.0.3,feaxios@0.0.3&treeshake=[*],[{+default+as+feaxiosDefault+}],[*],[{+default+as+feaxiosDefault1+}]
 
 `feaxios` is a lightweight alternative to **Axios**, providing the same familiar API with a significantly reduced footprint of **2KB**. It leverages the native `fetch()` API supported in all modern browsers, delivering a performant and minimalistic solution. This makes it an ideal choice for projects where minimizing bundle size is a priority.
 
