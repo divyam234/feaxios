@@ -1,0 +1,32 @@
+{
+  "include": [
+    "src",
+  ],
+  "compilerOptions": {
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "module": "esnext",
+    "target": "ESNext",
+    "moduleResolution": "Node",
+    "noEmit": true,
+    "importHelpers": true,
+    "outDir": "dist",
+    "removeComments": true,
+    "declaration": true,
+    "rootDir": "./",
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": true,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node","vitest/globals"] 
+  }
+}
