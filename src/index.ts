@@ -161,7 +161,7 @@ async function request(
 		signal: options.signal,
 	});
 
-	if (interceptors && interceptors.request.length >0) {
+	if (interceptors && interceptors.request.length > 0) {
 		const chain = interceptors.request
 			.filter(
 				(interceptor) =>
@@ -369,29 +369,29 @@ class AxiosInterceptorManager<V> {
 		this.#interceptors = [];
 	};
 
-	map=<U>(fn: (value: AxiosInterceptor<V>, index: number) => U)=>{
+	map = <U>(fn: (value: AxiosInterceptor<V>, index: number) => U) => {
 		return this.#interceptors.map(fn);
-	}
+	};
 
-	filter=(fn: (value: AxiosInterceptor<V>) => boolean)=>{
+	filter = (fn: (value: AxiosInterceptor<V>) => boolean) => {
 		return this.#interceptors.filter(fn);
-	}
+	};
 
-	get length(){
+	get length() {
 		return this.#interceptors.length;
 	}
 }
 
-export function isAxiosError<T = any, D = any>(payload: any) {
-	if (
+export function isAxiosError<T = any, D = any>(
+	payload: any,
+): payload is AxiosError<T, D> {
+	return (
 		payload !== null &&
 		typeof payload === "object" &&
 		(payload as AxiosError<T, D>).isAxiosError
-	) {
-		return true;
-	}
-	return false;
+	);
 }
+
 function createAxiosInstance(defaults?: CreateAxiosDefaults) {
 	const axiosInstance = new Axios(defaults);
 
@@ -404,9 +404,17 @@ function createAxiosInstance(defaults?: CreateAxiosDefaults) {
 
 	axios.interceptors = axiosInstance.interceptors;
 
-	["get", "delete", "head", "options", "post", "put", "patch", "all","request"].forEach(
-		(method) => (axios[method] = axiosInstance[method]),
-	);
+	[
+		"get",
+		"delete",
+		"head",
+		"options",
+		"post",
+		"put",
+		"patch",
+		"all",
+		"request",
+	].forEach((method) => (axios[method] = axiosInstance[method]));
 
 	return axios as AxiosInstance;
 }
