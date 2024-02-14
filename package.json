@@ -19,6 +19,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "publish": "pnpm publish --access public",
     "test-ui": "vitest --ui",
     "format": "prettier --write './**/*.{ts,md}'",
     "format:check": "prettier --check './**/*.{ts,md}'"
@@ -32,8 +33,10 @@
     ],
     "clean": true,
     "treeshake": true,
-    "minify": true,
     "splitting": false,
+    "target": "es2022",
+    "exports": "named",
+    "minify": true,
     "format": [
       "cjs",
       "esm"
@@ -59,9 +62,7 @@
     "msw": "^2.2.0",
     "prettier": "^3.2.5",
     "typescript": "^5.3.3",
-    "vitest": "^1.2.2"
-  },
-  "dependencies": {
+    "vitest": "^1.2.2",
     "@types/node": "^20.11.17",
     "tsup": "^8.0.2"
   }

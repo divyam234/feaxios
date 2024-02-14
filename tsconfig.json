@@ -9,7 +9,7 @@
     ],
     "module": "esnext",
     "target": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "noEmit": true,
     "importHelpers": true,
     "outDir": "dist",
