@@ -1,6 +1,6 @@
 {
   "name": "feaxios",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Tiny Fetch wrapper that provides a similar API to Axios",
   "main": "dist/index.js",
   "exports": {
@@ -27,7 +27,7 @@
   },
   "typesVersions": {
     "*": {
-      "react": [
+      "retry": [
         "./dist/retry.d.mts"
       ]
     }
