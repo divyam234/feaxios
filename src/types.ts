@@ -11,11 +11,6 @@ export interface AxiosResponseTransformer {
 	): any;
 }
 
-export interface AxiosBasicCredentials {
-	username: string;
-	password: string;
-}
-
 export type Method =
 	| "get"
 	| "GET"
@@ -107,7 +102,6 @@ export interface AxiosRequestConfig<D = any> {
 	timeout?: number;
 	timeoutErrorMessage?: string;
 	withCredentials?: boolean;
-	auth?: AxiosBasicCredentials;
 	responseType?: ResponseType;
 	validateStatus?: ((status: number) => boolean) | null;
 	signal?: AbortSignal;

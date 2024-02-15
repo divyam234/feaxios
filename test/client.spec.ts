@@ -1,4 +1,4 @@
-import axios, { AxiosError, CanceledError } from "../src/index";
+import { axios,AxiosError, CanceledError } from "../src/client";
 import {
 	afterEach,
 	beforeEach,
@@ -20,26 +20,28 @@ const posts = [
 		body: "first post body",
 	},
 ];
-
 const restHandlers = [
-	http.get("https://rest-endpoint.example", () => {
+	http.get("http://test.com", () => {
 		return HttpResponse.json(posts);
 	}),
-	http.get("http://abc.com", () => {
+	http.get("http://test1.com", () => {
 		return HttpResponse.text("hello");
 	}),
-	http.post("http://abc.com/post", (c) => {
+	http.post("http://test1.com/post", (c) => {
 		return new HttpResponse(c.request.body, { status: 200 });
 	}),
-	http.get("http://abc.com/timeout", async (c) => {
+	http.get("http://test1.com/timeout", async (c) => {
 		await new Promise((resolve) => setTimeout(resolve, 1000));
 		return HttpResponse.text("hello");
+	}),
+	http.get("http://test1.com/retry", async (c) => {
+		return new HttpResponse("hello", { status: 500 });
 	}),
 ];
 
 describe("feaxios", () => {
-	const jsonExample = "https://rest-endpoint.example";
-	const testHost = "http://abc.com";
+	const jsonExample = "http://test.com";
+	const testHost = "http://test1.com";
 
 	const server = setupServer(...restHandlers);
 
@@ -51,8 +53,7 @@ describe("feaxios", () => {
 
 	describe("basic functionality", () => {
 		test("should return text and a 200 status for a simple GET request", async () => {
-			const req = axios(jsonExample);
-			const res = await req;
+			const res = await axios(jsonExample);
 			expect(res).toBeInstanceOf(Object);
 			expect(res.status).toEqual(200);
 			expect(res.data).toMatchObject(posts);
@@ -191,6 +192,11 @@ describe("feaxios", () => {
 			axios.interceptors.response.clear();
 		});
 
+		afterAll(function () {
+			axios.interceptors.request.clear();
+			axios.interceptors.response.clear();
+		});
+
 		it("should add a request interceptor (asynchronous by default)", async () => {
 			let asyncFlag = false;
 			axios.interceptors.request.use(function (config) {
@@ -263,5 +269,4 @@ describe("feaxios", () => {
 			});
 		});
 	});
-
 });

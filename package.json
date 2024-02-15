@@ -13,6 +13,23 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       }
+    },
+    "./retry": {
+      "import": {
+        "types": "./dist/retry.d.mts",
+        "default": "./dist/retry.mjs"
+      },
+      "require": {
+        "types": "./dist/retry.d.ts",
+        "default": "./dist/retry.js"
+      }
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "react": [
+        "./dist/retry.d.mts"
+      ]
     }
   },
   "scripts": {
@@ -27,21 +44,6 @@
   "files": [
     "dist"
   ],
-  "tsup": {
-    "entry": [
-      "src/index.ts"
-    ],
-    "clean": true,
-    "treeshake": true,
-    "splitting":true,
-    "target": "es2022",
-    "minify": "terser",
-    "format": [
-      "cjs",
-      "esm"
-    ],
-    "dts": true
-  },
   "eslintConfig": {
     "extends": [
       "prettier"
@@ -60,10 +62,14 @@
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0 ",
     "msw": "^2.2.0",
+    "nock": "^13.5.1",
     "prettier": "^3.2.5",
     "terser": "^5.27.0",
     "tsup": "^8.0.2",
     "typescript": "^5.3.3",
     "vitest": "^1.2.2"
+  },
+  "dependencies": {
+    "is-retry-allowed": "^3.0.0"
   }
 }
