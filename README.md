@@ -12,9 +12,8 @@
 
 - **Timeouts:** Easily configure timeouts for requests, ensuring your application remains responsive and resilient.
 
-- **Works on Serverless:** Works on Serverless platform like cloudflare , vercel etc.
+- **Retries:** Axios retry package is integrated with feaxios.
 
-- Supports passing custom fetch options in axios client itself (needed very rarely).
 
 ### When to Use feaxios
 
@@ -23,18 +22,109 @@ While [Axios] remains an excellent module, `feaxios` provides a compelling optio
 ```sh
 npm install feaxios
 ```
+
+**_Request Config_**
+
+```ts
+{
+
+url: '/user',
+
+method: 'get', // default
+
+baseURL: 'https://some-domain.com/api/',
+
+transformRequest: [function (data, headers) {
+  return data;
+}],
+
+transformResponse: [function (data) {
+
+    return data;
+}],
+
+headers: {'test': 'test'},
+
+params: {
+    ID: 12345
+},
+
+ paramsSerializer: {
+
+    encode?: (param: string): string => {},
+
+    serialize?: (params: Record<string, any>, options?: ParamsSerializerOptions ),
+
+    indexes: false
+  },
+
+  data: {},
+
+  timeout: 1000, // default is 0ms
+
+  withCredentials: false,
+
+  responseType: 'text', // default
+
+  validateStatus: function (status) {
+    return status >= 200 && status < 300;
+  },
+
+  signal: new AbortController().signal,
+
+  fetchOptions:  {
+     redirect: "follow"
+  }
+
+}
+```
+
 ### Usage
 
 ```js
-import axios from 'feaxios';
+import axios from "feaxios";
 
-
-axios.get('https://api.example.com/data')
-  .then(response => {
+axios
+  .get("https://api.example.com/data")
+  .then((response) => {
     // Handle the response
     console.log(response.data);
   })
-  .catch(error => {
+  .catch((error) => {
     // Handle errors
     console.error(error);
   });
+```
+
+**_With Interceptors_**
+
+```js
+import axios from "feaxios";
+
+axios.interceptors.request.use((config) => {
+  config.headers.set("Authorization", "Bearer *");
+  return config;
+});
+axios.interceptors.response.use(
+  function (response) {
+    return response;
+  },
+  function (error) {
+    //do something with error
+    return Promise.reject(error);
+  },
+);
+```
+**Axios Retry Package is also ported to feaxios**
+
+```ts
+import axios from "feaxios"
+import axiosRetry from "feaxios/retry"
+
+const http = axios.create({
+  timeout: 3 * 1000 * 60,
+})
+
+axiosRetry(http, { retryDelay: axiosRetry.exponentialDelay })
+```
+Visit: https://github.com/softonic/axios-retry to see more options.
