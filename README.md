@@ -79,6 +79,8 @@ params: {
 }
 ```
 
+**In fetchOptions you can pass custom options like proxy , agents etc supported on nodejs**
+
 ### Usage
 
 ```js
