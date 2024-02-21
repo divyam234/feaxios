@@ -7,14 +7,6 @@ import type {
 } from "./index";
 import isRetryAllowed from "is-retry-allowed";
 
-declare module "./index" {
-    export interface AxiosRequestConfig {
-      'axios-retry'?: IAxiosRetryConfigExtended;
-    }
-  }
-
-export const namespace = 'axios-retry';
-
 export interface IAxiosRetryConfig {
 	/**
 	 * The number of times to retry before failing
@@ -164,7 +156,7 @@ function getRequestOptions(
 	config: AxiosRequestConfig,
 	defaultOptions: IAxiosRetryConfig,
 ): Required<IAxiosRetryConfig> & IAxiosRetryConfigExtended {
-	return { ...DEFAULT_OPTIONS, ...defaultOptions, ...config[namespace]  };
+	return { ...DEFAULT_OPTIONS, ...defaultOptions, ...config.retry };
 }
 
 function setCurrentState(
@@ -174,7 +166,7 @@ function setCurrentState(
 	const currentState = getRequestOptions(config, defaultOptions || {});
 	currentState.retryCount = currentState.retryCount || 0;
 	currentState.lastRequestTime = currentState.lastRequestTime || Date.now();
-    config[namespace] = currentState;
+	config.retry = currentState;
 	return currentState as Required<IAxiosRetryConfigExtended>;
 }
 

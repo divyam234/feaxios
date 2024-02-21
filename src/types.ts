@@ -1,3 +1,5 @@
+import type { IAxiosRetryConfigExtended } from "./retry";
+
 export interface AxiosRequestTransformer {
 	(this: InternalAxiosRequestConfig, data: any, headers: HeadersInit): any;
 }
@@ -92,6 +94,7 @@ export interface AxiosRequestConfig<D = any> {
 	validateStatus?: ((status: number) => boolean) | null;
 	signal?: AbortSignal;
 	fetchOptions?: RequestInit;
+	retry?: IAxiosRetryConfigExtended;
 }
 
 export type RawAxiosRequestConfig<D = any> = AxiosRequestConfig<D>;

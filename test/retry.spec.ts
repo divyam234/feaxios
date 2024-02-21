@@ -8,7 +8,6 @@ import axiosRetry, {
 	isIdempotentRequestError,
 	exponentialDelay,
 	isRetryableError,
-	namespace,
 } from "../src/retry";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -85,8 +84,8 @@ describe("axiosRetry(axios, { retries, retryCondition })", () => {
 				axiosRetry(client, { retries: 1, retryCondition: () => true });
 				client.get("http://example.com/test").then((result) => {
 					expect(result.status).toBe(200);
-					expect(result.config[namespace]!.retries).toBe(1);
-					expect(result.config[namespace]!.retryCount).toBe(1);
+					expect(result.config.retry!.retries).toBe(1);
+					expect(result.config.retry!.retryCount).toBe(1);
 					
 				}, ()=>Promise.reject("fail"));
 			});
@@ -222,7 +221,7 @@ describe("axiosRetry(axios, { retries, retryCondition })", () => {
 							expect(new Date().getTime() - startDate.getTime()).toBeLessThan(
 								timeout,
 							);
-							expect(error.config[namespace].retryCount).toBe(retries);
+							expect(error.config.retryCount).toBe(retries);
 							expect(error.code).toBe(NETWORK_ERROR.code);
 							
 						},
@@ -454,7 +453,7 @@ describe("axiosRetry(axios, { retries, retryCondition })", () => {
 		axiosRetry(client, { retries: 0 });
 		client
 			.get("http://example.com/test", {
-				"axios-retry": {
+				retry: {
 					retries: 2,
 				},
 			})
@@ -541,7 +540,7 @@ describe("axiosRetry(axios, { retries, onRetry })", () => {
 			axiosRetry(client, { retries: 2 });
 			client
 				.get("http://example.com/test", {
-					"axios-retry": {
+					retry: {
 						onRetry,
 					},
 				})
@@ -640,7 +639,7 @@ describe("axiosRetry(axios, { retries, onRetry })", () => {
 			axiosRetry(client, { retries: 2 });
 			client
 				.get("http://example.com/test", {
-					"axios-retry": {
+					retry: {
 						onRetry,
 					},
 				})
