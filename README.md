@@ -74,9 +74,8 @@ params: {
 
   fetchOptions:  {
      redirect: "follow"
-  }
-
-}
+  },
+ retry: { retries: 3 }
 ```
 
 **In fetchOptions you can pass custom options like proxy , agents etc supported on nodejs**
