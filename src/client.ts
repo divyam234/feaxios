@@ -98,6 +98,23 @@ async function handleFetch(
 	}
 }
 
+function buildURL(options: InternalAxiosRequestConfig) {
+	let url = options.url || "";
+	if (options.baseURL) {
+		url = options.url?.replace(/^(?!.*\/\/)\/?/, options.baseURL + "/")!;
+	}
+
+	if (options.params) {
+		url +=
+			(~options.url!.indexOf("?") ? "&" : "?") +
+			(options.paramsSerializer
+				? options.paramsSerializer(options.params)
+				: new URLSearchParams(options.params));
+	}
+
+	return url;
+}
+
 function mergeAxiosOptions(
 	input: AxiosRequestConfig,
 	defaults: CreateAxiosDefaults,
@@ -160,6 +177,7 @@ async function request(
 	const options = mergeAxiosOptions(config, defaults || {});
 
 	options.fetchOptions = options.fetchOptions || {};
+
 	options.timeout = options.timeout || 0;
 
 	options.headers = options.headers || new Headers();
@@ -176,6 +194,8 @@ async function request(
 
 	if (
 		data &&
+		options.headers.get("content-type") !==
+			"application/x-www-form-urlencoded" &&
 		typeof data === "object" &&
 		typeof data.append !== "function" &&
 		typeof data.text !== "function"
@@ -184,17 +204,13 @@ async function request(
 		options.headers.set("content-type", "application/json");
 	}
 
-	if (options.baseURL) {
-		options.url = options.url?.replace(/^(?!.*\/\/)\/?/, options.baseURL + "/");
+	if (data &&
+		options.headers.get("content-type") === "application/x-www-form-urlencoded"
+	) {
+		data = new URLSearchParams(data);
 	}
 
-	if (options.params) {
-		options.url +=
-			(~options.url!.indexOf("?") ? "&" : "?") +
-			(options.paramsSerializer
-				? options.paramsSerializer(options.params)
-				: new URLSearchParams(options.params));
-	}
+	options.url = buildURL(options);
 
 	options.method = method || options.method || "get";
 
@@ -249,6 +265,13 @@ async function request(
 	return resp;
 }
 
+function initFormConfig(config?: AxiosRequestConfig) {
+	config = config || {};
+	config.headers = new Headers(config.headers || {});
+	config.headers.set("content-type", "application/x-www-form-urlencoded");
+	return config;
+}
+
 class Axios {
 	defaults: CreateAxiosDefaults;
 	interceptors: {
@@ -262,6 +285,11 @@ class Axios {
 			response: new AxiosInterceptorManager<AxiosResponse>(),
 		};
 	}
+
+	getUri = (config?: AxiosRequestConfig) => {
+		const merged = mergeAxiosOptions(config || {}, this.defaults);
+		return buildURL(merged);
+	};
 
 	request = <T = any, R = AxiosResponse<T>, D = any>(
 		config: AxiosRequestConfig<D>,
@@ -351,6 +379,27 @@ class Axios {
 			data,
 		) as Promise<R>;
 
+	postForm = <T = any, R = AxiosResponse<T>, D = any>(
+		url: string,
+		data?: D,
+		config?: AxiosRequestConfig<D>,
+	) => {
+		return this.post(url, data, initFormConfig(config)) as Promise<R>;
+	};
+	putForm = <T = any, R = AxiosResponse<T>, D = any>(
+		url: string,
+		data?: D,
+		config?: AxiosRequestConfig<D>,
+	) => {
+		return this.put(url, data, initFormConfig(config)) as Promise<R>;
+	};
+	patchForm = <T = any, R = AxiosResponse<T>, D = any>(
+		url: string,
+		data?: D,
+		config?: AxiosRequestConfig<D>,
+	) => {
+		return this.patch(url, data, initFormConfig(config)) as Promise<R>;
+	};
 	all = <T>(promises: Array<T | Promise<T>>) => Promise.all(promises);
 }
 
@@ -381,7 +430,6 @@ class AxiosInterceptorManager<V> {
 	clear = (): void => {
 		this.handlers = [];
 	};
-
 
 	get length() {
 		return this.handlers.length;
@@ -420,6 +468,10 @@ function createAxiosInstance(defaults?: CreateAxiosDefaults) {
 		"patch",
 		"all",
 		"request",
+		"postForm",
+		"putForm",
+		"patchForm",
+		"getUri",
 	].forEach((method) => (axios[method] = axiosInstance[method]));
 
 	return axios as AxiosInstance;

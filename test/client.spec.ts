@@ -1,4 +1,4 @@
-import { axios,AxiosError, CanceledError } from "../src/client";
+import { axios, AxiosError, CanceledError } from "../src/client";
 import {
 	afterEach,
 	beforeEach,
@@ -57,6 +57,24 @@ describe("feaxios", () => {
 			expect(res).toBeInstanceOf(Object);
 			expect(res.status).toEqual(200);
 			expect(res.data).toMatchObject(posts);
+		});
+
+		test("should return full url", async () => {
+			const res = axios.getUri({
+				url: "/test",
+				baseURL: "http://test.com",
+				params: { a: 1, b: 2 },
+			});
+			expect(res).toEqual("http://test.com/test?a=1&b=2");
+		});
+
+		test("should return full url merged params", async () => {
+			const instance = axios.create({ baseURL: "http://test.com",params: { a: 1, b: 2 }})
+			const res = instance.getUri({
+				url: "/test",
+				params: { c: 1 },
+			});
+			expect(res).toEqual("http://test.com/test?a=1&b=2&c=1");
 		});
 	});
 
@@ -124,6 +142,14 @@ describe("feaxios", () => {
 				expect(res.status).toEqual(200);
 				expect(res.data).toBeTypeOf("string");
 			});
+
+			it("send FormData when using postForm", async () => {
+				const res = await axios.postForm("/post", {a:1,b:2}, {
+					baseURL: testHost,
+				});
+				expect(res.status).toEqual(200);
+				expect(res.data).toBeTypeOf("string");
+			});
 		});
 	});
 
@@ -156,26 +182,29 @@ describe("feaxios", () => {
 
 	describe("options.params & options.paramsSerializer", () => {
 		it("should throw timeout error", async () => {
-			axios.get("/timeout", {
-				baseURL: testHost,
-				timeout: 300,
-			}).catch((e) => {
-				expect(e).toBeInstanceOf(AxiosError);
-				expect(e.code).toBe(AxiosError.ETIMEDOUT);
-			})
+			axios
+				.get("/timeout", {
+					baseURL: testHost,
+					timeout: 300,
+				})
+				.catch((e) => {
+					expect(e).toBeInstanceOf(AxiosError);
+					expect(e.code).toBe(AxiosError.ETIMEDOUT);
+				});
 		});
 
 		it("should throw cancelled error", async () => {
-			const  controller = new AbortController();
-			axios.get("/timeout", {
-				baseURL: testHost,
-				signal:controller.signal,
-			}).catch((e) => {
-				expect(e).toBeInstanceOf(CanceledError);
-			})
+			const controller = new AbortController();
+			axios
+				.get("/timeout", {
+					baseURL: testHost,
+					signal: controller.signal,
+				})
+				.catch((e) => {
+					expect(e).toBeInstanceOf(CanceledError);
+				});
 			controller.abort();
 		});
-
 
 		it("should not throw timeout error", async () => {
 			const res = await axios.get("/timeout", {

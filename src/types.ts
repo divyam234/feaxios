@@ -75,20 +75,6 @@ export interface ParamsSerializerOptions extends SerializerOptions {
 	serialize?: CustomParamsSerializer;
 }
 
-type BrowserProgressEvent = any;
-
-export interface AxiosProgressEvent {
-	loaded: number;
-	total?: number;
-	progress?: number;
-	bytes: number;
-	rate?: number;
-	estimated?: number;
-	upload?: boolean;
-	download?: boolean;
-	event?: BrowserProgressEvent;
-}
-
 export interface AxiosRequestConfig<D = any> {
 	url?: string;
 	method?: Method | string;
@@ -140,8 +126,6 @@ export type AxiosPromise<T = any> = Promise<AxiosResponse<T>>;
 export interface AxiosInterceptorOptions {
 	runWhen?: (config: InternalAxiosRequestConfig) => boolean;
 }
-
-
 
 export type  FulfillCallback<V>  = ((value: V) => V | Promise<V>) | null
 
