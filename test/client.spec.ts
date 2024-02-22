@@ -189,7 +189,7 @@ describe("feaxios", () => {
 				})
 				.catch((e) => {
 					expect(e).toBeInstanceOf(AxiosError);
-					expect(e.code).toBe(AxiosError.ETIMEDOUT);
+					expect(e.code).toBe(AxiosError.ECONNABORTED);
 				});
 		});
 

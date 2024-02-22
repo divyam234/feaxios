@@ -49,10 +49,22 @@ async function handleFetch(
 ) {
 	let res: Response | null = null;
 
-	if (!options.signal && options.timeout) {
-		const controller = new AbortController();
-		setTimeout(() => controller.abort(), options.timeout);
-		fetchOptions.signal = controller.signal;
+	if ("any" in AbortSignal) {
+		let signals: AbortSignal[] = [];
+		if (options.timeout) {
+			signals.push(AbortSignal.timeout(options.timeout));
+		}
+		if (options.signal) {
+			signals.push(options.signal);
+		}
+		if (signals.length > 0) {
+			//@ts-ignore
+			fetchOptions.signal = AbortSignal.any(signals) as AbortSignal;
+		}
+	} else {
+		if (options.timeout) {
+			fetchOptions.signal = AbortSignal.timeout(options.timeout);
+		}
 	}
 
 	const request = new Request(options.url!, fetchOptions);
@@ -77,11 +89,20 @@ async function handleFetch(
 		}
 		return await prepareAxiosResponse(options, res);
 	} catch (error) {
-		if ((error as Error).name === "AbortError") {
-			const isTimeoutError = options.timeout && !options.signal;
+		if (
+			(error as Error).name === "AbortError" ||
+			(error as Error).name === "TimeoutError"
+		) {
+			const isTimeoutError = (error as Error).name === "TimeoutError";
 			return Promise.reject(
 				isTimeoutError
-					? new AxiosError("timeout", AxiosError.ETIMEDOUT, options, request)
+					? new AxiosError(
+							options.timeoutErrorMessage ||
+								`timeout of ${options.timeout} ms exceeded`,
+							AxiosError.ECONNABORTED,
+							options,
+							request,
+						)
 					: new CanceledError(null, options),
 			);
 		} else {
@@ -204,7 +225,8 @@ async function request(
 		options.headers.set("content-type", "application/json");
 	}
 
-	if (data &&
+	if (
+		data &&
 		options.headers.get("content-type") === "application/x-www-form-urlencoded"
 	) {
 		data = new URLSearchParams(data);
