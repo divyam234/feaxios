@@ -1,6 +1,6 @@
 {
   "name": "feaxios",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Tiny Fetch wrapper that provides a similar API to Axios",
   "main": "dist/index.js",
   "exports": {
