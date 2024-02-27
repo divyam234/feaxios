@@ -64,7 +64,7 @@ params: {
 
   withCredentials: false,
 
-  responseType: 'text', // default
+  responseType: 'json', // default
 
   validateStatus: function (status) {
     return status >= 200 && status < 300;
