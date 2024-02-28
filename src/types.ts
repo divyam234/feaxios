@@ -1,4 +1,4 @@
-import type { IAxiosRetryConfigExtended } from "./retry";
+import type { AxiosRetryConfigExtended } from "./retry";
 
 export interface AxiosRequestTransformer {
 	(this: InternalAxiosRequestConfig, data: any, headers: HeadersInit): any;
@@ -12,28 +12,6 @@ export interface AxiosResponseTransformer {
 		status?: number,
 	): any;
 }
-
-export type Method =
-	| "get"
-	| "GET"
-	| "delete"
-	| "DELETE"
-	| "head"
-	| "HEAD"
-	| "options"
-	| "OPTIONS"
-	| "post"
-	| "POST"
-	| "put"
-	| "PUT"
-	| "patch"
-	| "PATCH"
-	| "purge"
-	| "PURGE"
-	| "link"
-	| "LINK"
-	| "unlink"
-	| "UNLINK";
 
 export type ResponseType = "arrayBuffer" | "blob" | "json" | "text" | "stream";
 
@@ -79,7 +57,7 @@ export interface ParamsSerializerOptions extends SerializerOptions {
 
 export interface AxiosRequestConfig<D = any> {
 	url?: string;
-	method?: Method | string;
+	method?:string;
 	baseURL?: string;
 	transformRequest?: AxiosRequestTransformer | AxiosRequestTransformer[];
 	transformResponse?: AxiosResponseTransformer | AxiosResponseTransformer[];
@@ -94,7 +72,7 @@ export interface AxiosRequestConfig<D = any> {
 	validateStatus?: ((status: number) => boolean) | null;
 	signal?: AbortSignal;
 	fetchOptions?: RequestInit;
-	retry?: IAxiosRetryConfigExtended;
+	retry?: AxiosRetryConfigExtended;
 }
 
 export type RawAxiosRequestConfig<D = any> = AxiosRequestConfig<D>;

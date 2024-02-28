@@ -1,4 +1,3 @@
-//taken from axios-retry
 import http from "http";
 import nock from "nock";
 import axios, { AxiosError } from "../src/index";

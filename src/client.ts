@@ -7,7 +7,6 @@ import type {
 	CreateAxiosDefaults,
 	FulfillCallback,
 	InternalAxiosRequestConfig,
-	Method,
 	RejectCallback,
 } from "./types";
 
@@ -181,7 +180,7 @@ async function request(
 	configOrUrl: string | AxiosRequestConfig,
 	config?: AxiosRequestConfig,
 	defaults?: CreateAxiosDefaults,
-	method?: Method,
+	method?: string,
 	interceptors?: {
 		request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
 		response: AxiosInterceptorManager<AxiosResponse>;
@@ -236,7 +235,7 @@ async function request(
 
 	options.method = method || options.method || "get";
 
-	if (interceptors && interceptors.request.length > 0) {
+	if (interceptors && interceptors.request.handlers.length > 0) {
 		const chain = interceptors.request.handlers
 			.filter(
 				(interceptor) =>
@@ -264,7 +263,7 @@ async function request(
 
 	const init = mergeFetchOptions(
 		{
-			method: options.method.toUpperCase(),
+			method: options.method?.toUpperCase(),
 			body: data,
 			headers: options.headers,
 			credentials: options.withCredentials ? "include" : undefined,
@@ -274,7 +273,7 @@ async function request(
 	);
 
 	let resp = handleFetch(options, init as RequestInit);
-	if (interceptors && interceptors.response.length > 0) {
+	if (interceptors && interceptors.response.handlers.length > 0) {
 		const chain = interceptors.response.handlers
 			.map((interceptor) => [interceptor.fulfilled, interceptor.rejected])
 			.flat();
@@ -422,7 +421,6 @@ class Axios {
 	) => {
 		return this.patch(url, data, initFormConfig(config)) as Promise<R>;
 	};
-	all = <T>(promises: Array<T | Promise<T>>) => Promise.all(promises);
 }
 
 class AxiosInterceptorManager<V> {
@@ -452,10 +450,6 @@ class AxiosInterceptorManager<V> {
 	clear = (): void => {
 		this.handlers = [];
 	};
-
-	get length() {
-		return this.handlers.length;
-	}
 }
 
 export function isAxiosError<T = any, D = any>(
@@ -488,7 +482,6 @@ function createAxiosInstance(defaults?: CreateAxiosDefaults) {
 		"post",
 		"put",
 		"patch",
-		"all",
 		"request",
 		"postForm",
 		"putForm",
