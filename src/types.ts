@@ -127,3 +127,34 @@ export type AxiosInterceptor<V> = {
 	synchronous?: boolean;
 	runWhen?: (config: InternalAxiosRequestConfig) => boolean;
 };
+
+export interface AxiosInstance {
+	defaults: CreateAxiosDefaults;
+	interceptors: {
+		request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
+		response: AxiosInterceptorManager<AxiosResponse>;
+	};
+    getUri: (config?: AxiosRequestConfig) => string;
+    request: <T = any, R = AxiosResponse<T, any>, D = any>(config: AxiosRequestConfig<D>) => Promise<R>;
+    get: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    delete: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    head: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    options: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    post: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, data?: D | undefined, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    put: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, data?: D | undefined, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    patch: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, data?: D | undefined, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    postForm: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, data?: D | undefined, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    putForm: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, data?: D | undefined, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+    patchForm: <T = any, R = AxiosResponse<T, any>, D = any>(url: string, data?: D | undefined, config?: AxiosRequestConfig<D> | undefined) => Promise<R>;
+	<T = any, R = AxiosResponse<T>, D = any>(
+		config: AxiosRequestConfig<D>,
+	): Promise<R>;
+	<T = any, R = AxiosResponse<T>, D = any>(
+		url: string,
+		config?: AxiosRequestConfig<D>,
+	): Promise<R>;
+}
+
+export interface AxiosStatic extends AxiosInstance {
+	create: (defaults?: CreateAxiosDefaults) => AxiosInstance;
+}

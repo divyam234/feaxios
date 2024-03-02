@@ -2,8 +2,6 @@ import { axios } from "./client";
 
 export {
 	AxiosError,
-	AxiosInstance,
-	AxiosStatic,
 	CanceledError,
 	isAxiosError,
 } from "./client";
