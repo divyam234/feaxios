@@ -98,8 +98,7 @@ export interface AxiosResponse<T = any, D = any> {
 	statusText: string;
 	headers: Headers;
 	config: InternalAxiosRequestConfig<D>;
-	request?: any;
-	rawResponse?: Response;
+	request?: Request;
 }
 
 export type AxiosPromise<T = any> = Promise<AxiosResponse<T>>;

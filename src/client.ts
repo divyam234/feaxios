@@ -22,7 +22,6 @@ async function prepareAxiosResponse(
 		response.data = res.body;
 		return response;
 	}
-	response.rawResponse = res;
 	return res[options.responseType || "text"]()
 		.then((data) => {
 			if (options.transformResponse) {
