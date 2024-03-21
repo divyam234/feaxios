@@ -315,60 +315,67 @@ class AxiosInterceptorManager<V> {
 	};
 }
 
-function createAxiosInstance(defaults?: CreateAxiosDefaults){
-
+function createAxiosInstance(defaults?: CreateAxiosDefaults) {
 	defaults = defaults || ({} as CreateAxiosDefaults);
 
 	const interceptors = {
 		request: new AxiosInterceptorManager<InternalAxiosRequestConfig>(),
 		response: new AxiosInterceptorManager<AxiosResponse>(),
-	 };
+	};
 
 	const axios = (
 		url: string | AxiosRequestConfig,
 		config?: AxiosRequestConfig,
 	) => request(url, config, defaults, undefined, interceptors);
 
-
 	axios.defaults = defaults;
 
 	axios.interceptors = interceptors as AxiosInstance["interceptors"];
 
-	axios.getUri=(config?: AxiosRequestConfig) => {
-		const merged = mergeAxiosOptions(config || {},defaults!);
+	axios.getUri = (config?: AxiosRequestConfig) => {
+		const merged = mergeAxiosOptions(config || {}, defaults!);
 		return buildURL(merged);
 	};
 	axios.request = <T = any, R = AxiosResponse<T>, D = any>(
 		config: AxiosRequestConfig<D>,
-	) => request(config,undefined,defaults,undefined,interceptors) as Promise<R>;
+	) =>
+		request(config, undefined, defaults, undefined, interceptors) as Promise<R>;
 
-	["get","delete","head","options"].forEach(method => {
-	   axios[method] = <T = any, R = AxiosResponse<T>, D = any>(
-		url: string,
-		config?: AxiosRequestConfig<D>,
-	) =>request(url, config,defaults, method, interceptors) as Promise<R>;
+	["get", "delete", "head", "options"].forEach((method) => {
+		axios[method] = <T = any, R = AxiosResponse<T>, D = any>(
+			url: string,
+			config?: AxiosRequestConfig<D>,
+		) => request(url, config, defaults, method, interceptors) as Promise<R>;
 	});
 
-	["post","put","patch"].forEach((method) => {
+	["post", "put", "patch"].forEach((method) => {
 		axios[method] = <T = any, R = AxiosResponse<T>, D = any>(
-		 url: string,
-		 data?: D,
-		 config?: AxiosRequestConfig<D>,
-	 ) =>request(url, config,defaults, method, interceptors, data) as Promise<R>
-	 });
+			url: string,
+			data?: D,
+			config?: AxiosRequestConfig<D>,
+		) =>
+			request(url, config, defaults, method, interceptors, data) as Promise<R>;
+	});
 
-	 ["postForm","putForm","patchForm"].forEach((method) => {
+	["postForm", "putForm", "patchForm"].forEach((method) => {
 		axios[method] = <T = any, R = AxiosResponse<T>, D = any>(
-		 url: string,
-		 data?: D,
-		 config?: AxiosRequestConfig<D>,
-	 ) =>{
-		config = config || {};
-		config.headers = new Headers(config.headers || {});
-		config.headers.set("content-type", "application/x-www-form-urlencoded");
-		return request(url, config, defaults, method.replace("Form",""), interceptors, data) as Promise<R>
-	 }
-	 })
+			url: string,
+			data?: D,
+			config?: AxiosRequestConfig<D>,
+		) => {
+			config = config || {};
+			config.headers = new Headers(config.headers || {});
+			config.headers.set("content-type", "application/x-www-form-urlencoded");
+			return request(
+				url,
+				config,
+				defaults,
+				method.replace("Form", ""),
+				interceptors,
+				data,
+			) as Promise<R>;
+		};
+	});
 
 	return axios as AxiosInstance;
 }
@@ -383,11 +390,9 @@ export function isAxiosError<T = any, D = any>(
 	);
 }
 
+const axios = createAxiosInstance() as AxiosStatic;
 
-const axios =  createAxiosInstance() as AxiosStatic;
+axios.create = (defaults?: CreateAxiosDefaults) =>
+	createAxiosInstance(defaults);
 
-axios.create= (defaults?: CreateAxiosDefaults)=> createAxiosInstance(defaults);
-
-export {axios};
-
-export { AxiosError, CanceledError };
+export { AxiosError, CanceledError, axios };

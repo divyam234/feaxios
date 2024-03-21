@@ -15,6 +15,19 @@ export interface AxiosResponseTransformer {
 
 export type ResponseType = "arrayBuffer" | "blob" | "json" | "text" | "stream";
 
+export type Method =
+    | 'get' | 'GET'
+    | 'delete' | 'DELETE'
+    | 'head' | 'HEAD'
+    | 'options' | 'OPTIONS'
+    | 'post' | 'POST'
+    | 'put' | 'PUT'
+    | 'patch' | 'PATCH'
+    | 'purge' | 'PURGE'
+    | 'link' | 'LINK'
+    | 'unlink' | 'UNLINK';
+
+
 export interface FormDataVisitorHelpers {
 	defaultVisitor: SerializerVisitor;
 	convertValue: (value: any) => any;
@@ -57,7 +70,7 @@ export interface ParamsSerializerOptions extends SerializerOptions {
 
 export interface AxiosRequestConfig<D = any> {
 	url?: string;
-	method?:string;
+	method?: Method | string;
 	baseURL?: string;
 	transformRequest?: AxiosRequestTransformer | AxiosRequestTransformer[];
 	transformResponse?: AxiosResponseTransformer | AxiosResponseTransformer[];
