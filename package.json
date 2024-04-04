@@ -1,12 +1,12 @@
 {
   "name": "feaxios",
-  "version": "0.0.14",
+  "version": "0.0.17",
   "description": "Tiny Fetch wrapper that provides a similar API to Axios",
   "main": "dist/index.js",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/index.d.mts",
+        "types": "./dist/index.d.ts",
         "default": "./dist/index.mjs"
       },
       "require": {
@@ -16,7 +16,7 @@
     },
     "./retry": {
       "import": {
-        "types": "./dist/retry.d.mts",
+        "types": "./dist/retry.d.ts",
         "default": "./dist/retry.mjs"
       },
       "require": {
@@ -28,7 +28,7 @@
   "typesVersions": {
     "*": {
       "retry": [
-        "./dist/retry.d.mts"
+        "./dist/retry.d.ts"
       ]
     }
   },
@@ -36,7 +36,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "publish": "pnpm publish --access public",
+    "publish": "pnpm publish --access public --no-git-checks",
     "test-ui": "vitest --ui",
     "format": "prettier --write './**/*.{ts,md}'",
     "format:check": "prettier --check './**/*.{ts,md}'"
