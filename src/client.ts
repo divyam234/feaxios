@@ -124,7 +124,7 @@ function buildURL(options: InternalAxiosRequestConfig) {
 		url = options.url?.replace(/^(?!.*\/\/)\/?/, options.baseURL + "/")!;
 	}
 
-	if (options.params) {
+	if (options.params && Object.keys(options.params).length > 0){
 		url +=
 			(~options.url!.indexOf("?") ? "&" : "?") +
 			(options.paramsSerializer
