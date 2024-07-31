@@ -62,11 +62,12 @@ async function handleFetch(
 		}
 	} else {
 		if (options.timeout) {
+			//@ts-ignore
 			fetchOptions.signal = AbortSignal.timeout(options.timeout);
 		}
 	}
 
-	const request = new Request(options.url, fetchOptions);
+	const request = new Request(options.url as string, fetchOptions);
 
 	try {
 		res = await fetch(request);
@@ -119,11 +120,11 @@ async function handleFetch(
 
 function buildURL(options: InternalAxiosRequestConfig) {
 	let url = options.url || "";
-	if (options.baseURL) {
+	if (options.baseURL && options.url) {
 		url = options.url.replace(/^(?!.*\/\/)\/?/, `${options.baseURL}/`)!;
 	}
 
-	if (options.params && Object.keys(options.params).length > 0) {
+	if (options.params && Object.keys(options.params).length > 0 && options.url) {
 		url +=
 			(~options.url.indexOf("?") ? "&" : "?") +
 			(options.paramsSerializer
@@ -186,12 +187,12 @@ async function request(
 	},
 	data?: any,
 ) {
+	
 	if (typeof configOrUrl === "string") {
 		config = config || {};
 		config.url = configOrUrl;
-	} else {
-		config = configOrUrl || {};
-	}
+	} else config = configOrUrl || {};
+	
 
 	const options = mergeAxiosOptions(config, defaults || {});
 
@@ -302,6 +303,7 @@ class AxiosInterceptorManager<V> {
 
 	eject = (id: number): void => {
 		if (this.handlers[id]) {
+			//@ts-expect-error
 			this.handlers[id] = null;
 		}
 	};
@@ -329,6 +331,7 @@ function createAxiosInstance(defaults?: CreateAxiosDefaults) {
 	axios.interceptors = interceptors as AxiosInstance["interceptors"];
 
 	axios.getUri = (config?: AxiosRequestConfig) => {
+		//@ts-ignore
 		const merged = mergeAxiosOptions(config || {}, defaults);
 		return buildURL(merged);
 	};
@@ -375,7 +378,6 @@ function createAxiosInstance(defaults?: CreateAxiosDefaults) {
 
 	return axios as AxiosInstance;
 }
-
 export class AxiosError<T = unknown, D = any> extends Error {
 	config?: InternalAxiosRequestConfig<D>;
 	code?: string;

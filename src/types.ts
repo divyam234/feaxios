@@ -57,7 +57,7 @@ export interface ParamsSerializerOptions extends SerializerOptions {
 }
 
 export interface AxiosRequestConfig<D = any> {
-	url: string;
+	url?: string;
 	method?: Method | string;
 	baseURL?: string;
 	transformRequest?: AxiosRequestTransformer | AxiosRequestTransformer[];

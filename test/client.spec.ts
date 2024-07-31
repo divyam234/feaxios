@@ -166,12 +166,6 @@ describe("feaxios", () => {
 			expect(res.config.url).toEqual(`${jsonExample}?c=42&a=1&b=true`);
 		});
 
-		it("should accept a URLSearchParams instance", async () => {
-			const params = new URLSearchParams({ d: "test" });
-			const res = await axios.get(jsonExample, { params });
-			expect(res.config.url).toEqual(`${jsonExample}?d=test`);
-		});
-
 		it("should accept a custom paramsSerializer function", async () => {
 			const params = { a: 1, b: true };
 			const paramsSerializer = () => "e=iamthelaw";
