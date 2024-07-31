@@ -19,7 +19,7 @@ async function prepareAxiosResponse(
 	response.status = res.status;
 	response.statusText = res.statusText;
 	response.headers = res.headers;
-	if (options.responseType == "stream") {
+	if (options.responseType === "stream") {
 		response.data = res.body;
 		return response;
 	}
@@ -29,9 +29,9 @@ async function prepareAxiosResponse(
 				Array.isArray(options.transformResponse)
 					? options.transformResponse.map(
 							(fn) =>
-								(data = fn.call(options, data, res!.headers, res!.status)),
+								(data = fn.call(options, data, res?.headers, res?.status)),
 						)
-					: (data = options.transformResponse(data, res!.headers, res!.status));
+					: (data = options.transformResponse(data, res?.headers, res?.status));
 				response.data = data;
 			} else {
 				response.data = data;
@@ -49,7 +49,7 @@ async function handleFetch(
 	let res: Response | null = null;
 
 	if ("any" in AbortSignal) {
-		let signals: AbortSignal[] = [];
+		const signals: AbortSignal[] = [];
 		if (options.timeout) {
 			signals.push(AbortSignal.timeout(options.timeout));
 		}
@@ -66,7 +66,7 @@ async function handleFetch(
 		}
 	}
 
-	const request = new Request(options.url!, fetchOptions);
+	const request = new Request(options.url, fetchOptions);
 
 	try {
 		res = await fetch(request);
@@ -78,11 +78,11 @@ async function handleFetch(
 				new AxiosError(
 					`Request failed with status code ${res?.status}`,
 					[AxiosError.ERR_BAD_REQUEST, AxiosError.ERR_BAD_RESPONSE][
-						Math.floor(res!.status / 100) - 4
+						Math.floor(res?.status / 100) - 4
 					],
 					options,
 					request,
-					await prepareAxiosResponse(options, res!),
+					await prepareAxiosResponse(options, res),
 				),
 			);
 		}
@@ -104,7 +104,7 @@ async function handleFetch(
 						)
 					: new CanceledError(null, options),
 			);
-		} else {
+		}
 			return Promise.reject(
 				new AxiosError(
 					(error as Error).message,
@@ -114,19 +114,18 @@ async function handleFetch(
 					undefined,
 				),
 			);
-		}
 	}
 }
 
 function buildURL(options: InternalAxiosRequestConfig) {
 	let url = options.url || "";
 	if (options.baseURL) {
-		url = options.url?.replace(/^(?!.*\/\/)\/?/, options.baseURL + "/")!;
+		url = options.url.replace(/^(?!.*\/\/)\/?/, `${options.baseURL}/`)!;
 	}
 
-	if (options.params && Object.keys(options.params).length > 0){
+	if (options.params && Object.keys(options.params).length > 0) {
 		url +=
-			(~options.url!.indexOf("?") ? "&" : "?") +
+			(~options.url.indexOf("?") ? "&" : "?") +
 			(options.paramsSerializer
 				? options.paramsSerializer(options.params)
 				: new URLSearchParams(options.params));
@@ -200,7 +199,7 @@ async function request(
 
 	options.timeout = options.timeout || 0;
 
-	options.headers = options.headers || new Headers();
+	options.headers = new Headers(options.headers || {});
 
 	data = data || options.data;
 
@@ -243,8 +242,7 @@ async function request(
 					(typeof interceptor.runWhen === "function" &&
 						interceptor.runWhen(options)),
 			)
-			.map((interceptor) => [interceptor.fulfilled, interceptor.rejected])
-			.flat();
+			.flatMap((interceptor) => [interceptor.fulfilled, interceptor.rejected]);
 
 		let result = options;
 
@@ -255,7 +253,7 @@ async function request(
 			try {
 				if (onFulfilled) result = onFulfilled(result);
 			} catch (error) {
-				if (onRejected) (onRejected as RejectCallback)!(error);
+				if (onRejected) (onRejected as RejectCallback)?.(error);
 				break;
 			}
 		}
@@ -275,8 +273,7 @@ async function request(
 	let resp = handleFetch(options, init as RequestInit);
 	if (interceptors && interceptors.response.handlers.length > 0) {
 		const chain = interceptors.response.handlers
-			.map((interceptor) => [interceptor.fulfilled, interceptor.rejected])
-			.flat();
+			.flatMap((interceptor) => [interceptor.fulfilled, interceptor.rejected]);
 
 		for (let i = 0, len = chain.length; i < len; i += 2) {
 			resp = resp.then(chain[i], chain[i + 1]);
@@ -305,7 +302,7 @@ class AxiosInterceptorManager<V> {
 
 	eject = (id: number): void => {
 		if (this.handlers[id]) {
-			this.handlers[id] = null!;
+			this.handlers[id] = null;
 		}
 	};
 
@@ -332,7 +329,7 @@ function createAxiosInstance(defaults?: CreateAxiosDefaults) {
 	axios.interceptors = interceptors as AxiosInstance["interceptors"];
 
 	axios.getUri = (config?: AxiosRequestConfig) => {
-		const merged = mergeAxiosOptions(config || {}, defaults!);
+		const merged = mergeAxiosOptions(config || {}, defaults);
 		return buildURL(merged);
 	};
 	axios.request = <T = any, R = AxiosResponse<T>, D = any>(

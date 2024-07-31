@@ -1,17 +1,12 @@
 import type { AxiosRetryConfigExtended } from "./retry";
 
-export interface AxiosRequestTransformer {
-	(this: InternalAxiosRequestConfig, data: any, headers: HeadersInit): any;
-}
+export type AxiosRequestTransformer = (this: InternalAxiosRequestConfig, data: any, headers: HeadersInit) => any
 
-export interface AxiosResponseTransformer {
-	(
+export type AxiosResponseTransformer = (
 		this: InternalAxiosRequestConfig,
 		data: any,
 		headers: HeadersInit,
-		status?: number,
-	): any;
-}
+		status?: number,) => any
 
 export type ResponseType = "arrayBuffer" | "blob" | "json" | "text" | "stream";
 
@@ -34,15 +29,12 @@ export interface FormDataVisitorHelpers {
 	isVisitable: (value: any) => boolean;
 }
 
-export interface SerializerVisitor {
-	(
+export type SerializerVisitor = (
 		this: GenericFormData,
 		value: any,
 		key: string | number,
 		path: null | Array<string | number>,
-		helpers: FormDataVisitorHelpers,
-	): boolean;
-}
+		helpers: FormDataVisitorHelpers,) => boolean
 
 interface GenericFormData {
 	append(name: string, value: any, options?: any): any;
@@ -55,13 +47,9 @@ export interface SerializerOptions {
 	indexes?: boolean | null;
 }
 
-export interface ParamEncoder {
-	(value: any, defaultEncoder: (value: any) => any): any;
-}
+export type ParamEncoder = (value: any, defaultEncoder: (value: any) => any) => any
 
-export interface CustomParamsSerializer {
-	(params: Record<string, any>, options?: ParamsSerializerOptions): string;
-}
+export type CustomParamsSerializer = (params: Record<string, any>, options?: ParamsSerializerOptions) => string
 
 export interface ParamsSerializerOptions extends SerializerOptions {
 	encode?: ParamEncoder;
@@ -69,7 +57,7 @@ export interface ParamsSerializerOptions extends SerializerOptions {
 }
 
 export interface AxiosRequestConfig<D = any> {
-	url?: string;
+	url: string;
 	method?: Method | string;
 	baseURL?: string;
 	transformRequest?: AxiosRequestTransformer | AxiosRequestTransformer[];
