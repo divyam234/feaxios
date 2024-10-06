@@ -1,4 +1,4 @@
-import { axios, AxiosError, CanceledError } from "../src/client";
+import { axios, AxiosError, CanceledError, defaultTransformer } from "../src/client";
 import {
 	afterEach,
 	beforeEach,
@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
+import { InternalAxiosRequestConfig } from "../src/types";
 
 const posts = [
 	{
@@ -292,4 +293,69 @@ describe("feaxios", () => {
 			});
 		});
 	});
+	
+describe('defaultTransformer', () => {
+    let headers: Headers;
+
+    beforeEach(() => {
+        headers = new Headers()
+    });
+
+    test('should set content-type to text/plain for string data', () => {
+        const data = "Hello, World!";
+        defaultTransformer(data, headers);
+        expect(headers.get("content-type")).toBe("text/plain");
+    });
+
+    test('should set content-type to application/x-www-form-urlencoded for URLSearchParams', () => {
+        const data = new URLSearchParams({ key: 'value' });
+        defaultTransformer(data, headers);
+        expect(headers.get("content-type")).toBe("application/x-www-form-urlencoded");
+    });
+
+    test('should set content-type to application/octet-stream for Blob', () => {
+        const data = new Blob();
+        defaultTransformer(data, headers);
+        expect(headers.get("content-type")).toBe("application/octet-stream");
+    });
+
+    test('should set content-type to application/octet-stream for ArrayBuffer', () => {
+        const data = new ArrayBuffer(16);
+        defaultTransformer(data, headers);
+        expect(headers.get("content-type")).toBe("application/octet-stream");
+    });
+
+    test('should set content-type to application/octet-stream for TypedArray', () => {
+        const data = new Uint8Array(16);
+        defaultTransformer(data, headers);
+        expect(headers.get("content-type")).toBe("application/octet-stream");
+    });
+
+    test('should set content-type to application/json for plain object', () => {
+        const data = { key: 'value' };
+        defaultTransformer(data, headers);
+        expect(headers.get("content-type")).toBe("application/json");
+    });
+
+    test('should not overwrite existing content-type', () => {
+        headers.set("content-type", "custom/type");
+        const data = "Hello, World!";
+        defaultTransformer(data, headers);
+        expect(headers.get("content-type")).toBe("custom/type");
+    });
+
+    test('should convert plain object to URLSearchParams if content-type is application/x-www-form-urlencoded', () => {
+        headers.set("content-type", "application/x-www-form-urlencoded");
+        const data = { key: 'value' };
+        const transformedData = defaultTransformer(data, headers);
+        expect(transformedData.toString()).toBe(new URLSearchParams(data).toString());
+    });
+
+    test('should stringify object if content-type is application/json', () => {
+        headers.set("content-type", "application/json");
+        const data = { key: 'value' };
+        const transformedData = defaultTransformer(data, headers);
+        expect(transformedData).toBe(JSON.stringify(data));
+    });
+});
 });

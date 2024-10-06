@@ -1,6 +1,6 @@
 import type { AxiosRetryConfigExtended } from "./retry";
 
-export type AxiosRequestTransformer = (this: InternalAxiosRequestConfig, data: any, headers: HeadersInit) => any
+export type AxiosRequestTransformer = (this: InternalAxiosRequestConfig, data: any, headers: Headers) => any
 
 export type AxiosResponseTransformer = (
 		this: InternalAxiosRequestConfig,

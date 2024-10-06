@@ -106,15 +106,15 @@ async function handleFetch(
 					: new CanceledError(null, options),
 			);
 		}
-			return Promise.reject(
-				new AxiosError(
-					(error as Error).message,
-					undefined,
-					options,
-					request,
-					undefined,
-				),
-			);
+		return Promise.reject(
+			new AxiosError(
+				(error as Error).message,
+				undefined,
+				options,
+				request,
+				undefined,
+			),
+		);
 	}
 }
 
@@ -176,6 +176,40 @@ function mergeFetchOptions(input: RequestInit, defaults: RequestInit) {
 	return merged as InternalAxiosRequestConfig;
 }
 
+export function defaultTransformer(data: any, headers: Headers) {
+	const contentType = headers.get("content-type");
+	if (!contentType) {
+		if (typeof data === "string") {
+			headers.set("content-type", "text/plain");
+		} else if (data instanceof URLSearchParams) {
+			headers.set("content-type", "application/x-www-form-urlencoded");
+		} else if (
+			data instanceof Blob ||
+			data instanceof ArrayBuffer ||
+			ArrayBuffer.isView(data)
+		) {
+			headers.set("content-type", "application/octet-stream");
+		} else if (
+			typeof data === "object" &&
+			typeof data.append !== "function" &&
+			typeof data.text !== "function"
+		) {
+			data = JSON.stringify(data);
+			headers.set("content-type", "application/json");
+		}
+	} else {
+		if (
+			contentType === "application/x-www-form-urlencoded" &&
+			!(data instanceof URLSearchParams)
+		) {
+			data = new URLSearchParams(data);
+		} else if (contentType === "application/json" && typeof data === "object") {
+			data = JSON.stringify(data);
+		}
+	}
+	return data;
+}
+
 async function request(
 	configOrUrl: string | AxiosRequestConfig,
 	config?: AxiosRequestConfig,
@@ -187,12 +221,10 @@ async function request(
 	},
 	data?: any,
 ) {
-	
 	if (typeof configOrUrl === "string") {
 		config = config || {};
 		config.url = configOrUrl;
 	} else config = configOrUrl || {};
-	
 
 	const options = mergeAxiosOptions(config, defaults || {});
 
@@ -202,33 +234,16 @@ async function request(
 
 	options.headers = new Headers(options.headers || {});
 
+	options.transformRequest = options.transformRequest ?? defaultTransformer;
+
 	data = data || options.data;
 
-	if (options.transformRequest) {
+	if (options.transformRequest  && data) {
 		Array.isArray(options.transformRequest)
 			? options.transformRequest.map(
 					(fn) => (data = fn.call(options, data, options.headers)),
 				)
-			: options.transformRequest(data, options.headers);
-	}
-
-	if (
-		data &&
-		options.headers.get("content-type") !==
-			"application/x-www-form-urlencoded" &&
-		typeof data === "object" &&
-		typeof data.append !== "function" &&
-		typeof data.text !== "function"
-	) {
-		data = JSON.stringify(data);
-		options.headers.set("content-type", "application/json");
-	}
-
-	if (
-		data &&
-		options.headers.get("content-type") === "application/x-www-form-urlencoded"
-	) {
-		data = new URLSearchParams(data);
+			: (data = options.transformRequest(data, options.headers));
 	}
 
 	options.url = buildURL(options);
@@ -273,8 +288,10 @@ async function request(
 
 	let resp = handleFetch(options, init as RequestInit);
 	if (interceptors && interceptors.response.handlers.length > 0) {
-		const chain = interceptors.response.handlers
-			.flatMap((interceptor) => [interceptor.fulfilled, interceptor.rejected]);
+		const chain = interceptors.response.handlers.flatMap((interceptor) => [
+			interceptor.fulfilled,
+			interceptor.rejected,
+		]);
 
 		for (let i = 0, len = chain.length; i < len; i += 2) {
 			resp = resp.then(chain[i], chain[i + 1]);
