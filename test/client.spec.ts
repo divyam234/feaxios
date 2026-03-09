@@ -21,12 +21,18 @@ const posts = [
 		body: "first post body",
 	},
 ];
+const binaryPayload = new Uint8Array([0x00, 0x01, 0x02, 0x03]);
 const restHandlers = [
 	http.get("http://test.com", () => {
 		return HttpResponse.json(posts);
 	}),
 	http.get("http://test1.com", () => {
 		return HttpResponse.text("hello");
+	}),
+	http.get("http://test1.com/binary", () => {
+		return new HttpResponse(binaryPayload, {
+			headers: { "content-type": "application/octet-stream" },
+		});
 	}),
 	http.post("http://test1.com/post", (c) => {
 		return new HttpResponse(c.request.body, { status: 200 });
@@ -109,6 +115,14 @@ describe("feaxios", () => {
 				responseType: "text",
 			});
 			expect(res.data).toEqual(posts);
+		});
+
+		it("should return ArrayBuffer for responseType:arraybuffer", async () => {
+			const res = await axios.get(`${testHost}/binary`, {
+				responseType: "arraybuffer",
+			});
+			expect(res.data).toBeInstanceOf(ArrayBuffer);
+			expect(new Uint8Array(res.data)).toEqual(binaryPayload);
 		});
 	});
 

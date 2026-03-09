@@ -23,7 +23,8 @@ async function prepareAxiosResponse(
 		response.data = res.body;
 		return response;
 	}
-	return res[options.responseType || "text"]()
+	const method = options.responseType === "arraybuffer" ? "arrayBuffer" : (options.responseType || "text");
+	return res[method]()
 		.then((data) => {
 			if (options.transformResponse) {
 				Array.isArray(options.transformResponse)
