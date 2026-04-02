@@ -1,12 +1,7 @@
 {
-  "include": [
-    "src",
-  ],
+  "include": ["src", "test/typecheck.ts"],
   "compilerOptions": {
-    "lib": [
-      "esnext",
-      "dom"
-    ],
+    "lib": ["esnext", "dom"],
     "module": "esnext",
     "target": "ESNext",
     "moduleResolution": "Bundler",
@@ -27,6 +22,6 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["node","vitest/globals"] 
+    "types": ["node", "bun-types"]
   }
 }

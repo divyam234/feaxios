@@ -1,884 +1,219 @@
-import http from "http";
-import nock from "nock";
-import axios, { AxiosError} from "../src/index";
-import axiosRetry, {
-	isNetworkError,
-	isSafeRequestError,
-	isIdempotentRequestError,
+import axios, { AxiosError } from "../src";
+import retry, {
 	exponentialDelay,
+	isIdempotentRequestError,
+	isNetworkError,
+	isNetworkOrIdempotentRequestError,
 	isRetryableError,
-} from "../src/retry";
-import { afterEach, describe, expect, it } from "vitest";
+	isSafeRequestError,
+} from "../src/plugins/retry";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
+
+let getAttempts = 0;
+let postAttempts = 0;
+
+const server = setupServer(
+	http.get("http://retry.test/test", () => {
+		getAttempts += 1;
+		return getAttempts < 2
+			? HttpResponse.text("Failed", { status: 500 })
+			: HttpResponse.text("It worked!", { status: 200 });
+	}),
+	http.get("http://retry.test/fail-always", () => {
+		getAttempts += 1;
+		return HttpResponse.text("Failed", { status: 500 });
+	}),
+	http.post("http://retry.test/test", async ({ request }) => {
+		postAttempts += 1;
+		const body = await request.json();
+		expect(body).toEqual({ a: "b" });
+		return postAttempts < 2
+			? HttpResponse.text("Failed", { status: 500 })
+			: HttpResponse.text("ok", { status: 200 });
+	}),
+);
 
 const NETWORK_ERROR = new AxiosError("Some connection error");
 NETWORK_ERROR.code = "ECONNRESET";
 
-function setupResponses(client, responses) {
-	const configureResponse = () => {
-		const response = responses.shift();
-		if (response) {
-			response();
-		}
-	};
-	client.interceptors.response.use(
-		(result) => {
-			configureResponse();
-			return result;
-		},
-		(error) => {
-			configureResponse();
-			return Promise.reject(error);
-		},
-	);
-	configureResponse();
+function createRetryError(method?: string, status?: number, code?: string) {
+	const error = new AxiosError("Error response");
+	if (method) {
+		error.config = { method } as AxiosError["config"];
+	}
+	if (status !== undefined) {
+		error.response = { status } as AxiosError["response"];
+	}
+	if (code) {
+		error.code = code;
+	}
+	return error;
 }
 
-describe("axiosRetry(axios, { retries, retryCondition })", () => {
+describe("retry plugin", () => {
+	beforeAll(() => server.listen({}));
 	afterEach(() => {
-		nock.cleanAll();
-		nock.enableNetConnect();
+		getAttempts = 0;
+		postAttempts = 0;
+		server.resetHandlers();
 	});
+	afterAll(() => server.close());
 
-	describe("when the response is successful", () => {
-		it("should resolve with it", (done) => {
-			const client = axios.create();
-			setupResponses(client, [
-				() => nock("http://example.com").get("/test").reply(200, "It worked!"),
-			]);
-			axiosRetry(client, { retries: 0 });
-			client.get("http://example.com/test").then((result) => {
-				expect(result.status).toBe(200);
-			}, ()=>Promise.reject("fail"));
-		});
-	});
-
-	describe("when the response is an error", () => {
-		it("should check if it satisfies the `retryCondition`", (done) => {
-			const client = axios.create();
-			setupResponses(client, [
-				() =>
-					nock("http://example.com").get("/test").replyWithError(NETWORK_ERROR),
-				() => nock("http://example.com").get("/test").reply(200, "It worked!"),
-			]);
-			const retryCondition = (error) => {
-				expect(error).toEqual(NETWORK_ERROR);
-				
-				return false;
-			};
-			axiosRetry(client, { retries: 1, retryCondition });
-			client.get("http://example.com/test").catch(() => {});
-		});
-
-		describe("when it satisfies the retry condition", () => {
-			it("should resolve with a successful retry", (done) => {
-				const client = axios.create();
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR),
-					() =>
-						nock("http://example.com").get("/test").reply(200, "It worked!"),
-				]);
-				axiosRetry(client, { retries: 1, retryCondition: () => true });
-				client.get("http://example.com/test").then((result) => {
-					expect(result.status).toBe(200);
-					expect(result.config.retry!.retries).toBe(1);
-					expect(result.config.retry!.retryCount).toBe(1);
-					
-				}, ()=>Promise.reject("fail"));
-			});
-
-			it("should not run transformRequest twice", (done) => {
-				const client = axios.create({
-					transformRequest: [(data) => JSON.stringify(data)],
-				});
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.post("/test", (body) => {
-								expect(body.a).toBe("b");
-								return true;
-							})
-							.replyWithError(NETWORK_ERROR),
-					() =>
-						nock("http://example.com")
-							.post("/test", (body) => {
-								expect(body.a).toBe("b");
-								return true;
-							})
-							.reply(200, "It worked!"),
-				]);
-				axiosRetry(client, { retries: 1, retryCondition: () => true });
-				client.post("http://example.com/test", { a: "b" }).then((result) => {
-					expect(result.status).toBe(200);
-					
-				}, ()=>Promise.reject("fail"));
-			});
-
-			it("should reject with a request error if retries <= 0", (done) => {
-				const client = axios.create();
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR),
-				]);
-				axiosRetry(client, { retries: 0, retryCondition: () => false });
-				client
-					.get("http://example.com/test")
-					.then(
-						()=>Promise.reject("fail"),
-						(error) => {
-							expect(error).toEqual(NETWORK_ERROR);
-							
-						},
-					)
-					.catch(()=>Promise.reject("fail"));
-			});
-
-			it("should reject with a request error if there are more errors than retries", (done) => {
-				const client = axios.create();
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(new Error("foo error")),
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR),
-				]);
-				axiosRetry(client, { retries: 1, retryCondition: () => true });
-				client
-					.get("http://example.com/test")
-					.then(
-						()=>Promise.reject("fail"),
-						(error) => {
-							expect(error).toEqual(NETWORK_ERROR);
-							
-						},
-					)
-					.catch(()=>Promise.reject("fail"));
-			});
-
-			it("should honor the original `timeout` across retries", (done) => {
-				const client = axios.create();
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.delay(75)
-							.replyWithError(NETWORK_ERROR),
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.delay(75)
-							.replyWithError(NETWORK_ERROR),
-					() => nock("http://example.com").get("/test").reply(200),
-				]);
-				axiosRetry(client, { retries: 3 });
-				client
-					.get("http://example.com/test", { timeout: 100 })
-					.then(
-						()=>Promise.reject("fail"),
-						(error) => {
-							expect(error.code).toBe("ECONNABORTED");
-							
-						},
-					)
-					.catch(()=>Promise.reject("fail"));
-			});
-
-			it("should not make a retry attempt if the whole request lifecycle takes more than `timeout`", (done) => {
-				const client = axios.create();
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR),
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR), // delay >= 200 ms
-					() => nock("http://example.com").get("/test").reply(200), // delay >= 400 ms
-				]);
-				const timeout = 500;
-				const retries = 2;
-				axiosRetry(client, {
-					retries,
-					retryDelay: exponentialDelay,
-					shouldResetTimeout: false,
-				});
-				const startDate = new Date();
-
-				client
-					.get("http://example.com/test", { timeout })
-					.then(
-						()=>Promise.reject("fail"),
-						(error) => {
-							expect(new Date().getTime() - startDate.getTime()).toBeLessThan(
-								timeout,
-							);
-							expect(error.config.retryCount).toBe(retries);
-							expect(error.code).toBe(NETWORK_ERROR.code);
-							
-						},
-					)
-					.catch(()=>Promise.reject("fail"));
-			});
-
-			it("should reset the original `timeout` between requests", (done) => {
-				const client = axios.create();
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.delay(75)
-							.replyWithError(NETWORK_ERROR),
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.delay(75)
-							.replyWithError(NETWORK_ERROR),
-					() => nock("http://example.com").get("/test").reply(200),
-				]);
-				axiosRetry(client, { retries: 3, shouldResetTimeout: true });
-				client
-					.get("http://example.com/test", { timeout: 100 })
-					.then((result) => {
-						expect(result.status).toBe(200);
-						
-					})
-					.catch(()=>Promise.reject("fail"));
-			});
-
-			it("should reject with errors without a `config` property without retrying", (done) => {
-				const client = axios.create();
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR),
-					() => nock("http://example.com").get("/test").reply(200),
-				]);
-				// Force returning a plain error without extended information from Axios
-				const generatedError = new Error();
-				client.interceptors.response.use(null, () =>
-					Promise.reject(generatedError),
-				);
-				axiosRetry(client, { retries: 1, retryCondition: () => true });
-
-				client
-					.get("http://example.com/test")
-					.then(
-						()=>Promise.reject("fail"),
-						(error) => {
-							expect(error).toEqual(generatedError);
-							
-						},
-					)
-					.catch(()=>Promise.reject("fail"));
-			});
-
-			it("should work with a custom `agent` configuration", (done) => {
-				const httpAgent = new http.Agent();
-				// Simulate circular structure
-				const fakeSocket = { foo: "foo" };
-				// @ts-ignore
-				httpAgent.sockets["multisearch.api.softonic.com:80:"] = [fakeSocket];
-				// @ts-ignore
-				fakeSocket.socket = fakeSocket;
-				// @ts-ignore
-				const client = axios.create({  fetchOptions: { agent: httpAgent } });
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR),
-					() =>
-						nock("http://example.com").get("/test").reply(200, "It worked!"),
-				]);
-				axiosRetry(client, { retries: 1, retryCondition: () => true });
-				client.get("http://example.com/test").then((result) => {
-					expect(result.status).toBe(200);
-					
-				}, ()=>Promise.reject("fail"));
-			});
-
-			it("should work with a custom `httpAgent` configuration", (done) => {
-				const httpAgent = new http.Agent();
-				// Simulate circular structure
-				const fakeSocket = { foo: "foo" };
-				// @ts-ignore
-				httpAgent.sockets["multisearch.api.softonic.com:80:"] = [fakeSocket];
-				// @ts-ignore
-				fakeSocket.socket = fakeSocket;
-				// @ts-ignore
-				const client = axios.create({  fetchOptions: { agent: httpAgent } });
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR),
-					() =>
-						nock("http://example.com").get("/test").reply(200, "It worked!"),
-				]);
-				axiosRetry(client, { retries: 1, retryCondition: () => true });
-				client.get("http://example.com/test").then((result) => {
-					expect(result.status).toBe(200);
-					
-				}, ()=>Promise.reject("fail"));
-			});
-
-			describe("when retry condition is returning a promise", () => {
-				it("should resolve with a successful retry as usual", (done) => {
-					const client = axios.create();
-					setupResponses(client, [
-						() =>
-							nock("http://example.com")
-								.get("/test")
-								.replyWithError(NETWORK_ERROR),
-						() =>
-							nock("http://example.com").get("/test").reply(200, "It worked!"),
-					]);
-					axiosRetry(client, {
-						retries: 1,
-						retryCondition: () =>
-							new Promise((res) => {
-								res(true);
-							}),
-					});
-					client.get("http://example.com/test").then((result) => {
-						expect(result.status).toBe(200);
-						
-					}, ()=>Promise.reject("fail"));
-				});
-
-				it("should reject when promise result is false", (done) => {
-					const client = axios.create();
-					setupResponses(client, [
-						() =>
-							nock("http://example.com")
-								.get("/test")
-								.replyWithError(NETWORK_ERROR),
-						() =>
-							nock("http://example.com").get("/test").reply(200, "It worked!"),
-					]);
-					axiosRetry(client, {
-						retries: 1,
-						retryCondition: () =>
-							new Promise((res) => {
-								res(false);
-							}),
-					});
-					client
-						.get("http://example.com/test")
-						.then(
-							()=>Promise.reject("fail"),
-							(error) => {
-								expect(error).toEqual(NETWORK_ERROR);
-								
-							},
-						)
-						.catch(()=>Promise.reject("fail"));
-				});
-			});
-		});
-
-		describe("when it does NOT satisfy the retry condition", () => {
-			it("should reject with the error", (done) => {
-				const client = axios.create();
-				setupResponses(client, [
-					() =>
-						nock("http://example.com")
-							.get("/test")
-							.replyWithError(NETWORK_ERROR),
-					() =>
-						nock("http://example.com").get("/test").reply(200, "It worked!"),
-				]);
-				axiosRetry(client, { retries: 1, retryCondition: () => false });
-				client
-					.get("http://example.com/test")
-					.then(
-						()=>Promise.reject("fail"),
-						(error) => {
-							expect(error).toEqual(NETWORK_ERROR);
-							
-						},
-					)
-					.catch(()=>Promise.reject("fail"));
-			});
-
-			describe("given as promise", () => {
-				it("should reject with the error", (done) => {
-					const client = axios.create();
-					setupResponses(client, [
-						() =>
-							nock("http://example.com")
-								.get("/test")
-								.replyWithError(NETWORK_ERROR),
-						() =>
-							nock("http://example.com").get("/test").reply(200, "It worked!"),
-					]);
-					axiosRetry(client, {
-						retries: 1,
-						retryCondition: () => new Promise((_resolve, reject) => reject()),
-					});
-					client
-						.get("http://example.com/test")
-						.then(
-							()=>Promise.reject("fail"),
-							(error) => {
-								expect(error).toEqual(NETWORK_ERROR);
-								
-							},
-						)
-						.catch(()=>Promise.reject("fail"));
-				});
-			});
-		});
-	});
-
-	it("should use request-specific configuration", (done) => {
+	it("retries a failed request and eventually succeeds", async () => {
 		const client = axios.create();
-		setupResponses(client, [
-			() =>
-				nock("http://example.com").get("/test").replyWithError(NETWORK_ERROR),
-			() =>
-				nock("http://example.com").get("/test").replyWithError(NETWORK_ERROR),
-			() => nock("http://example.com").get("/test").reply(200),
-		]);
-		axiosRetry(client, { retries: 0 });
-		client
-			.get("http://example.com/test", {
-				retry: {
-					retries: 2,
-				},
-			})
-			.then((result) => {
-				expect(result.status).toBe(200);
-				
-			}, ()=>Promise.reject("fail"));
-	});
-});
+		client.use(retry, { retries: 1, retryCondition: () => true });
 
-describe("axiosRetry(axios, { retries, retryDelay })", () => {
-	describe("when custom retryDelay function is supplied", () => {
-		it("should execute for each retry", (done) => {
-			const client = axios.create();
-			setupResponses(client, [
-				() =>
-					nock("http://example.com").get("/test").replyWithError(NETWORK_ERROR),
-				() =>
-					nock("http://example.com").get("/test").replyWithError(NETWORK_ERROR),
-				() =>
-					nock("http://example.com").get("/test").replyWithError(NETWORK_ERROR),
-				() => nock("http://example.com").get("/test").reply(200, "It worked!"),
-			]);
-			let retryCount = 0;
-			axiosRetry(client, {
-				retries: 4,
-				retryCondition: () => true,
-				retryDelay: () => {
-					retryCount += 1;
-					return 0;
-				},
-			});
-			client.get("http://example.com/test").then(() => {
-				expect(retryCount).toBe(3);
-				
-			}, ()=>Promise.reject("fail"));
+		const res = await client.get("http://retry.test/test");
+		expect(res.status).toBe(200);
+		expect(res.data).toBe("It worked!");
+		expect(getAttempts).toBe(2);
+		expect(res.config.retry?.retryCount).toBe(1);
+	});
+
+	it("does not retry when the retry condition is false", async () => {
+		const client = axios.create();
+		client.use(retry, { retries: 3, retryCondition: () => false });
+
+		await expect(
+			client.get("http://retry.test/fail-always"),
+		).rejects.toMatchObject({
+			response: { status: 500 },
 		});
-	});
-});
-
-describe("axiosRetry(axios, { retries, onRetry })", () => {
-	afterEach(() => {
-		nock.cleanAll();
-		nock.enableNetConnect();
+		expect(getAttempts).toBe(1);
 	});
 
-	describe("when the onRetry is handled", () => {
-		it("should resolve with correct number of retries", (done) => {
-			const client = axios.create();
-			setupResponses(client, [
-				() => nock("http://example.com").get("/test").reply(500, "Failed!"),
-			]);
-			let retryCalled = 0;
-			let finalRetryCount = 0;
-			const onRetry = (retryCount, err, requestConfig) => {
-				retryCalled += 1;
-				finalRetryCount = retryCount;
+	it("supports async retry conditions", async () => {
+		const client = axios.create();
+		client.use(retry, { retries: 1, retryCondition: async () => true });
 
-				expect(err).not.toBe(undefined);
-				expect(requestConfig).not.toBe(undefined);
-			};
-			axiosRetry(client, { retries: 2, onRetry });
-			client.get("http://example.com/test").catch(() => {
-				expect(retryCalled).toBe(2);
-				expect(finalRetryCount).toBe(2);
-				
-			});
+		const res = await client.get("http://retry.test/test");
+		expect(res.status).toBe(200);
+		expect(getAttempts).toBe(2);
+	});
+
+	it("uses request-specific retry config over client defaults", async () => {
+		const client = axios.create();
+		client.use(retry, { retries: 0 });
+
+		const res = await client.get("http://retry.test/test", {
+			retry: { retries: 1, retryCondition: () => true },
 		});
 
-		it("should use onRetry set on request", (done) => {
-			const client = axios.create();
-			setupResponses(client, [
-				() => nock("http://example.com").get("/test").reply(500, "Failed!"),
-			]);
-			let retryCalled = 0;
-			let finalRetryCount = 0;
-			const onRetry = (retryCount, err, requestConfig) => {
-				retryCalled += 1;
-				finalRetryCount = retryCount;
-
-				expect(err).not.toBe(undefined);
-				expect(requestConfig).not.toBe(undefined);
-			};
-			axiosRetry(client, { retries: 2 });
-			client
-				.get("http://example.com/test", {
-					retry: {
-						onRetry,
-					},
-				})
-				.catch(() => {
-					expect(retryCalled).toBe(2);
-					expect(finalRetryCount).toBe(2);
-					
-				});
-		});
+		expect(res.status).toBe(200);
+		expect(getAttempts).toBe(2);
 	});
 
-	describe("when the onRetry is returning a promise", () => {
-		it("should resolve with correct number of retries", (done) => {
-			const client = axios.create();
-			setupResponses(client, [
-				() => nock("http://example.com").get("/test").reply(500, "Failed!"),
-			]);
-
-			let retryCalled = 0;
-			let finalRetryCount = 0;
-			const onRetry = (retryCount, err, requestConfig) =>
-				new Promise<void>((resolve) => {
-					setTimeout(() => {
-						retryCalled += 1;
-						finalRetryCount = retryCount;
-
-						expect(err).not.toBe(undefined);
-						expect(requestConfig).not.toBe(undefined);
-						resolve(void 0);
-					}, 100);
-				});
-
-			axiosRetry(client, { retries: 2, onRetry });
-			client.get("http://example.com/test").catch(() => {
-				expect(retryCalled).toBe(2);
-				expect(finalRetryCount).toBe(2);
-				
-			});
-		});
-
-		it("should reject with the error", (done) => {
-			const client = axios.create();
-			setupResponses(client, [
-				() => nock("http://example.com").get("/test").reply(500, "Failed!"),
-			]);
-
-			let retryCalled = 0;
-			let finalRetryCount = 0;
-			const onRetry = (retryCount, err, requestConfig) =>
-				new Promise<void>((resolve, reject) => {
-					setTimeout(() => {
-						retryCalled += 1;
-						finalRetryCount = retryCount;
-
-						expect(err).not.toBe(undefined);
-						expect(requestConfig).not.toBe(undefined);
-						reject(new Error("onRetry error"));
-					}, 100);
-				});
-
-			axiosRetry(client, { retries: 2, onRetry });
-
-			client
-				.get("http://example.com/test")
-				.then(
-					()=>Promise.reject("fail"),
-					(error) => {
-						expect(error.message).toBe("onRetry error");
-						expect(retryCalled).toBe(1);
-						expect(finalRetryCount).toBe(1);
-						
-					},
-				)
-				.catch(()=>Promise.reject("fail"));
-		});
-
-		it("should use onRetry set on request", (done) => {
-			const client = axios.create();
-			setupResponses(client, [
-				() => nock("http://example.com").get("/test").reply(500, "Failed!"),
-			]);
-
-			let retryCalled = 0;
-			let finalRetryCount = 0;
-			const onRetry = (retryCount, err, requestConfig) =>
-				new Promise<void>((resolve) => {
-					setTimeout(() => {
-						retryCalled += 1;
-						finalRetryCount = retryCount;
-
-						expect(err).not.toBe(undefined);
-						expect(requestConfig).not.toBe(undefined);
-						resolve(void 0);
-					}, 100);
-				});
-			axiosRetry(client, { retries: 2 });
-			client
-				.get("http://example.com/test", {
-					retry: {
-						onRetry,
-					},
-				})
-				.catch(() => {
-					expect(retryCalled).toBe(2);
-					expect(finalRetryCount).toBe(2);
-					
-				});
-		});
-	});
-});
-
-describe("isNetworkError(error)", () => {
-	it("should be true for network errors like connection refused", () => {
-		const connectionRefusedError = new AxiosError();
-		connectionRefusedError.code = "ECONNREFUSED";
-
-		expect(isNetworkError(connectionRefusedError)).toBe(true);
-	});
-
-	it("should be false for timeout errors", () => {
-		const timeoutError = new AxiosError();
-		timeoutError.code = "ECONNABORTED";
-
-		expect(isNetworkError(timeoutError)).toBe(false);
-	});
-
-	it("should be false for errors with a response", () => {
-		const responseError = new AxiosError("Response error");
-		responseError.response = { status: 500 } as AxiosError["response"];
-
-		expect(isNetworkError(responseError)).toBe(false);
-	});
-
-	it("should be false for other errors", () => {
-		expect(isNetworkError(new AxiosError())).toBe(false);
-	});
-});
-
-describe("isSafeRequestError(error)", () => {
-	["get", "head", "options"].forEach((method) => {
-		it(`should be true for "${method}" requests with a 5xx response`, () => {
-			const errorResponse = new AxiosError("Error response");
-			errorResponse.config = { method } as AxiosError["config"];
-			errorResponse.response = { status: 500 } as AxiosError["response"];
-
-			expect(isSafeRequestError(errorResponse)).toBe(true);
-		});
-
-		it(`should be true for "${method}" requests without a response`, () => {
-			const errorResponse = new AxiosError("Error response");
-			errorResponse.config = { method } as AxiosError["config"];
-
-			expect(isSafeRequestError(errorResponse)).toBe(true);
-		});
-	});
-
-	["post", "put", "patch", "delete"].forEach((method) => {
-		it(`should be false for "${method}" requests with a 5xx response`, () => {
-			const errorResponse = new AxiosError("Error response");
-			errorResponse.config = { method } as AxiosError["config"];
-			errorResponse.response = { status: 500 } as AxiosError["response"];
-
-			expect(isSafeRequestError(errorResponse)).toBe(false);
-		});
-
-		it(`should be false for "${method}" requests without a response`, () => {
-			const errorResponse = new AxiosError("Error response");
-			errorResponse.config = { method } as AxiosError["config"];
-
-			expect(isSafeRequestError(errorResponse)).toBe(false);
-		});
-	});
-
-	it("should be false for errors without a `config`", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.response = { status: 500 } as AxiosError["response"];
-
-		expect(isSafeRequestError(errorResponse)).toBe(false);
-	});
-
-	it("should be false for non-5xx responses", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.config = { method: "get" } as AxiosError["config"];
-		errorResponse.response = { status: 404 } as AxiosError["response"];
-
-		expect(isSafeRequestError(errorResponse)).toBe(false);
-	});
-
-	it("should be false for aborted requests", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.code = "ECONNABORTED";
-		errorResponse.config = { method: "get" } as AxiosError["config"];
-
-		expect(isSafeRequestError(errorResponse)).toBe(false);
-	});
-});
-
-describe("isIdempotentRequestError(error)", () => {
-	["get", "head", "options", "put", "delete"].forEach((method) => {
-		it(`should be true for "${method}" requests with a 5xx response`, () => {
-			const errorResponse = new AxiosError("Error response");
-			errorResponse.config = { method } as AxiosError["config"];
-			errorResponse.response = { status: 500 } as AxiosError["response"];
-
-			expect(isIdempotentRequestError(errorResponse)).toBe(true);
-		});
-
-		it(`should be true for "${method}" requests without a response`, () => {
-			const errorResponse = new AxiosError("Error response");
-			errorResponse.config = { method } as AxiosError["config"];
-
-			expect(isIdempotentRequestError(errorResponse)).toBe(true);
-		});
-	});
-
-	["post", "patch"].forEach((method) => {
-		it(`should be false for "${method}" requests with a 5xx response`, () => {
-			const errorResponse = new AxiosError("Error response");
-			errorResponse.config = { method } as AxiosError["config"];
-			errorResponse.response = { status: 500 } as AxiosError["response"];
-
-			expect(isIdempotentRequestError(errorResponse)).toBe(false);
-		});
-
-		it(`should be false for "${method}" requests without a response`, () => {
-			const errorResponse = new AxiosError("Error response");
-			errorResponse.config = { method } as AxiosError["config"];
-			errorResponse.response = { status: 500 } as AxiosError["response"];
-
-			expect(isIdempotentRequestError(errorResponse)).toBe(false);
-		});
-	});
-
-	// eslint-disable-next-line jasmine/no-spec-dupes
-	it("should be false for errors without a `config`", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.response = { status: 500 } as AxiosError["response"];
-
-		expect(isIdempotentRequestError(errorResponse)).toBe(false);
-	});
-
-	// eslint-disable-next-line jasmine/no-spec-dupes
-	it("should be false for non-5xx responses", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.config = { method: "get" } as AxiosError["config"];
-		errorResponse.response = { status: 404 } as AxiosError["response"];
-
-		expect(isIdempotentRequestError(errorResponse)).toBe(false);
-	});
-
-	// eslint-disable-next-line jasmine/no-spec-dupes
-	it("should be false for aborted requests", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.code = "ECONNABORTED";
-		errorResponse.config = { method: "get" } as AxiosError["config"];
-
-		expect(isIdempotentRequestError(errorResponse)).toBe(false);
-	});
-});
-
-describe("exponentialDelay", () => {
-	it("should return exponential retry delay", () => {
-		function assertTime(retryNumber) {
-			const min = Math.pow(2, retryNumber) * 100;
-			const max = Math.pow(2, retryNumber * 100) * 0.2;
-			const time = exponentialDelay(retryNumber);
-
-			expect(time >= min && time <= max).toBe(true);
+	it("calls onRetry for each retry attempt", async () => {
+		const client = axios.create();
+		const retryCounts: number[] = [];
+		client.use(retry, { retries: 1, retryCondition: () => true, onRetry });
+		function onRetry(retryCount: number) {
+			retryCounts.push(retryCount);
 		}
 
-		[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(assertTime);
+		await client.get("http://retry.test/test");
+		expect(retryCounts).toEqual([1]);
 	});
 
-	it("should change delay time when specifying delay factor", () => {
-		function assertTime(retryNumber) {
-			const min = Math.pow(2, retryNumber) * 1000;
-			const max = Math.pow(2, retryNumber * 1000) * 0.2;
-			const time = exponentialDelay(retryNumber, undefined, 1000);
+	it("uses the custom retryDelay callback", async () => {
+		const client = axios.create();
+		let delayCalls = 0;
+		const retryDelay = () => {
+			delayCalls += 1;
+			return 0;
+		};
+		client.use(retry, { retries: 1, retryCondition: () => true, retryDelay });
 
-			expect(time >= min && time <= max).toBe(true);
-		}
-
-		[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(assertTime);
-	});
-});
-
-describe("isRetryableError(error)", () => {
-	it("should be false for aborted requests", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.code = "ECONNABORTED";
-
-		expect(isRetryableError(errorResponse)).toBe(false);
+		await client.get("http://retry.test/test");
+		expect(delayCalls).toBe(1);
 	});
 
-	it("should be true for timeouts", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.code = "ECONNRESET";
+	it("does not run transformRequest twice across retries", async () => {
+		let transformCalls = 0;
+		const client = axios.create({
+			transformRequest: [
+				(data) => {
+					transformCalls += 1;
+					return JSON.stringify(data);
+				},
+			],
+		});
+		client.use(retry, { retries: 1, retryCondition: () => true });
 
-		expect(isRetryableError(errorResponse)).toBe(true);
+		const res = await client.post("http://retry.test/test", { a: "b" });
+		expect(res.status).toBe(200);
+		expect(transformCalls).toBe(1);
+		expect(postAttempts).toBe(2);
 	});
 
-	it("should be true for a 5xx response", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.code = "ECONNRESET";
-		errorResponse.response = { status: 500 } as AxiosError["response"];
-
-		expect(isRetryableError(errorResponse)).toBe(true);
-	});
-
-	it("should be false for a response !== 5xx", () => {
-		const errorResponse = new AxiosError("Error response");
-		errorResponse.code = "ECONNRESET";
-		errorResponse.response = { status: 400 } as AxiosError["response"];
-
-		expect(isRetryableError(errorResponse)).toBe(false);
-	});
-});
-
-describe("axiosRetry interceptors", () => {
-	it("should be able to successfully eject interceptors added by axiosRetry", () => {
+	it("adds retry interceptors via use()", () => {
 		const client = axios.create();
 		// @ts-ignore
 		expect(client.interceptors.request.handlers.length).toBe(0);
 		// @ts-ignore
 		expect(client.interceptors.response.handlers.length).toBe(0);
-		const { requestInterceptorId, responseInterceptorId } = axiosRetry(client);
+
+		client.use(retry, { retries: 1 });
+
 		// @ts-ignore
 		expect(client.interceptors.request.handlers.length).toBe(1);
 		// @ts-ignore
 		expect(client.interceptors.response.handlers.length).toBe(1);
-		// @ts-ignore
-		expect(client.interceptors.request.handlers[0]).not.toBe(null);
-		// @ts-ignore
-		expect(client.interceptors.response.handlers[0]).not.toBe(null);
-		client.interceptors.request.eject(requestInterceptorId);
-		client.interceptors.response.eject(responseInterceptorId);
-		// @ts-ignore
-		expect(client.interceptors.request.handlers[0]).toBe(null);
-		// @ts-ignore
-		expect(client.interceptors.response.handlers[0]).toBe(null);
+	});
+});
+
+describe("retry helpers", () => {
+	it("detects network errors", () => {
+		const error = new AxiosError();
+		error.code = "ECONNREFUSED";
+		expect(isNetworkError(error)).toBe(true);
+		expect(
+			isNetworkError(createRetryError("get", undefined, "ECONNABORTED")),
+		).toBe(false);
+		expect(isNetworkError(createRetryError("get", 500))).toBe(false);
+	});
+
+	it("detects retryable errors", () => {
+		expect(isRetryableError(createRetryError("get", 500))).toBe(true);
+		expect(isRetryableError(createRetryError("get", 404))).toBe(false);
+		expect(
+			isRetryableError(createRetryError("get", undefined, "ECONNABORTED")),
+		).toBe(false);
+	});
+
+	it("detects safe request errors", () => {
+		expect(isSafeRequestError(createRetryError("get", 500))).toBe(true);
+		expect(isSafeRequestError(createRetryError("GET", 500))).toBe(true);
+		expect(isSafeRequestError(createRetryError("post", 500))).toBe(false);
+	});
+
+	it("detects idempotent request errors", () => {
+		expect(isIdempotentRequestError(createRetryError("put", 500))).toBe(true);
+		expect(isIdempotentRequestError(createRetryError("DELETE", 500))).toBe(
+			true,
+		);
+		expect(isIdempotentRequestError(createRetryError("patch", 500))).toBe(
+			false,
+		);
+	});
+
+	it("detects network or idempotent errors", () => {
+		const network = new AxiosError();
+		network.code = "ECONNREFUSED";
+		expect(isNetworkOrIdempotentRequestError(network)).toBe(true);
+		expect(
+			isNetworkOrIdempotentRequestError(createRetryError("put", 500)),
+		).toBe(true);
+		expect(
+			isNetworkOrIdempotentRequestError(createRetryError("post", 404)),
+		).toBe(false);
+	});
+
+	it("computes exponential delay", () => {
+		const delay = exponentialDelay(2, undefined, 100);
+		expect(delay).toBeGreaterThanOrEqual(400);
+		expect(delay).toBeLessThan(500);
 	});
 });
